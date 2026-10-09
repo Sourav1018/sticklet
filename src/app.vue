@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import '@/assets/css/tailwind.css'
+import { useTheme } from '@/composables/useTheme'
+
+useTheme()
 </script>
 
 <template>

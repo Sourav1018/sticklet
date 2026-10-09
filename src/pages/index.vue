@@ -5,6 +5,8 @@ import { useNotesStore, NOTE_COLORS, type NoteColor } from '@/stores/notes'
 import { useTauriWindow } from '@/composables/useTauriWindow'
 import { useNativeIO } from '@/composables/useNativeIO'
 import { useAppUpdater } from '@/composables/useAppUpdater'
+import { useTheme } from '@/composables/useTheme'
+import { marked } from 'marked'
 import StickyNote from '@/components/StickyNote.vue'
 import UpdateDialog from '@/components/UpdateDialog.vue'
 import { Button } from '@/components/ui/button'
@@ -20,22 +22,36 @@ import {
   FileUp,
   RefreshCw,
   Sparkles,
+  Sun,
+  Moon,
 } from '@lucide/vue'
 
 const notesStore = useNotesStore()
 const tauriWindow = useTauriWindow()
 const nativeIO = useNativeIO()
 const appUpdater = useAppUpdater()
+const { isDark, toggleTheme } = useTheme()
 const selectedColorFilter = ref<NoteColor | 'all'>('all')
 const bannerMessage = ref('')
 
 async function handleImportFile() {
   const res = await nativeIO.openNoteFile()
   if (res.success && res.content) {
-    const newNote = notesStore.createNote('yellow', res.content)
+    let htmlContent = res.content
+    // If the imported file is markdown or plain text, convert to rich HTML for TipTap editor
+    try {
+      const parsed = marked.parse(res.content, { async: false, breaks: true })
+      if (typeof parsed === 'string' && parsed.trim()) {
+        htmlContent = parsed
+      }
+    } catch (e) {
+      console.warn('Failed to parse markdown with marked:', e)
+    }
+
+    const newNote = notesStore.createNote('yellow', htmlContent)
     await notesStore.persistNoteToDb(newNote)
     await tauriWindow.openNoteWindow(newNote.id)
-    showBanner('Note imported successfully!')
+    showBanner('Note imported and converted successfully!')
   }
 }
 
@@ -154,6 +170,17 @@ function stripHtml(html: string): string {
               @click="handleExportAllToFolder"
             >
               <FolderDown class="w-4 h-4" />
+            </button>
+
+            <!-- Dark / Light Mode Toggle -->
+            <button
+              type="button"
+              class="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400 transition-colors"
+              :title="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+              @click="toggleTheme"
+            >
+              <Sun v-if="isDark" class="w-4 h-4 text-amber-400 hover:rotate-45 transition-transform" />
+              <Moon v-else class="w-4 h-4 text-slate-600 dark:text-zinc-400 hover:-rotate-12 transition-transform" />
             </button>
 
             <!-- Check for Updates -->

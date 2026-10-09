@@ -11,6 +11,7 @@ import Image from '@tiptap/extension-image'
 import { useNotesStore, NOTE_COLORS, type Note, type NoteColor } from '@/stores/notes'
 import { useTauriWindow } from '@/composables/useTauriWindow'
 import { useNativeIO } from '@/composables/useNativeIO'
+import { marked } from 'marked'
 import {
   Plus,
   Pin,
@@ -115,6 +116,21 @@ const editor = useEditor({
             }
           }
           reader.readAsDataURL(file)
+          return true
+        } else if (file.name.endsWith('.md') || file.name.endsWith('.txt') || file.name.endsWith('.html')) {
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            const raw = e.target?.result as string
+            if (raw) {
+              try {
+                const parsed = marked.parse(raw, { async: false, breaks: true }) as string
+                editor.value?.commands.insertContent(parsed)
+              } catch (_) {
+                editor.value?.commands.insertContent(raw)
+              }
+            }
+          }
+          reader.readAsText(file)
           return true
         }
       }
