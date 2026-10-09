@@ -4,7 +4,9 @@ import { listen } from '@tauri-apps/api/event'
 import { useNotesStore, NOTE_COLORS, type NoteColor } from '@/stores/notes'
 import { useTauriWindow } from '@/composables/useTauriWindow'
 import { useNativeIO } from '@/composables/useNativeIO'
+import { useAppUpdater } from '@/composables/useAppUpdater'
 import StickyNote from '@/components/StickyNote.vue'
+import UpdateDialog from '@/components/UpdateDialog.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -16,11 +18,14 @@ import {
   ExternalLink,
   FolderDown,
   FileUp,
+  RefreshCw,
+  Sparkles,
 } from '@lucide/vue'
 
 const notesStore = useNotesStore()
 const tauriWindow = useTauriWindow()
 const nativeIO = useNativeIO()
+const appUpdater = useAppUpdater()
 const selectedColorFilter = ref<NoteColor | 'all'>('all')
 const bannerMessage = ref('')
 
@@ -151,6 +156,24 @@ function stripHtml(html: string): string {
               <FolderDown class="w-4 h-4" />
             </button>
 
+            <!-- Check for Updates -->
+            <button
+              type="button"
+              class="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400 transition-colors relative"
+              :class="{ 'text-amber-500': appUpdater.status.value === 'available' }"
+              :title="appUpdater.status.value === 'checking' ? 'Checking for updates...' : 'Check for Updates'"
+              @click="() => appUpdater.checkForUpdates(false)"
+            >
+              <RefreshCw
+                class="w-4 h-4"
+                :class="{ 'animate-spin text-amber-500': appUpdater.status.value === 'checking' }"
+              />
+              <span
+                v-if="appUpdater.status.value === 'available'"
+                class="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse"
+              />
+            </button>
+
             <!-- New Note -->
             <Button
               size="sm"
@@ -162,6 +185,26 @@ function stripHtml(html: string): string {
               <span>New</span>
             </Button>
           </div>
+        </div>
+
+        <!-- Update / Notification Banner -->
+        <div
+          v-if="appUpdater.status.value === 'up-to-date'"
+          class="px-2.5 py-1 text-xs bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-900/50 rounded animate-in fade-in"
+        >
+          Sticklet is up to date! ✨
+        </div>
+
+        <div
+          v-if="appUpdater.status.value === 'available'"
+          class="px-2.5 py-1.5 text-xs bg-amber-50 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800 rounded animate-in fade-in flex items-center justify-between cursor-pointer hover:bg-amber-100/70 transition-colors"
+          @click="() => appUpdater.downloadAndInstall()"
+        >
+          <div class="flex items-center space-x-1.5">
+            <Sparkles class="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+            <span class="font-medium">v{{ appUpdater.updateInfo.value?.version }} available!</span>
+          </div>
+          <span class="underline font-semibold text-[11px]">Install</span>
         </div>
 
         <div
@@ -327,6 +370,9 @@ function stripHtml(html: string): string {
         </Button>
       </div>
     </main>
+
+    <!-- Update Dialog Component -->
+    <UpdateDialog />
   </div>
 </template>
 

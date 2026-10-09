@@ -116,6 +116,11 @@ fn close_note_window(app: AppHandle, note_id: String) -> Result<Option<WindowBou
     Ok(None)
 }
 
+#[tauri::command]
+fn restart_app(app: AppHandle) {
+    app.restart();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -125,14 +130,19 @@ pub fn run() {
             let db_state = init_db(app.handle())?;
             app.manage(db_state);
 
+            // Register Updater Plugin
+            let _ = app.handle().plugin(tauri_plugin_updater::Builder::new().build());
+
             // Build Tray Context Menu
             let new_note_item = MenuItem::with_id(app, "new_note", "➕ New Note", true, None::<&str>)?;
             let show_hub_item = MenuItem::with_id(app, "show_hub", "📝 Notes Hub", true, None::<&str>)?;
+            let check_updates_item = MenuItem::with_id(app, "check_updates", "🔄 Check for Updates", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "❌ Quit", true, None::<&str>)?;
 
             let menu = Menu::with_items(app, &[
                 &new_note_item,
                 &show_hub_item,
+                &check_updates_item,
                 &quit_item,
             ])?;
 
@@ -166,6 +176,14 @@ pub fn run() {
                                     let _ = main.unminimize();
                                     let _ = main.set_focus();
                                 }
+                            }
+                            "check_updates" => {
+                                if let Some(main) = app.get_webview_window("main") {
+                                    let _ = main.show();
+                                    let _ = main.unminimize();
+                                    let _ = main.set_focus();
+                                }
+                                let _ = app.emit("check-for-updates", ());
                             }
                             "quit" => {
                                 IS_QUITTING.store(true, Ordering::SeqCst);
@@ -224,7 +242,8 @@ pub fn run() {
             pick_folder,
             export_all_notes_to_folder,
             clipboard_write_text,
-            clipboard_read_text
+            clipboard_read_text,
+            restart_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
