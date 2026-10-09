@@ -49,11 +49,6 @@ fn open_note_window(
     let w = width.unwrap_or(340.0).max(240.0);
     let h = height.unwrap_or(400.0).max(200.0);
 
-    let init_script = format!(
-        "window.__STICKLET_NOTE_ID__ = '{}'; if (window.location.hash !== '#/note/{}') {{ window.location.hash = '#/note/{}'; }}",
-        note_id, note_id, note_id
-    );
-
     let mut builder = WebviewWindowBuilder::new(&app, &window_label, WebviewUrl::App("index.html".into()))
         .title("Sticklet")
         .inner_size(w, h)
@@ -61,7 +56,6 @@ fn open_note_window(
         .decorations(false) // Frameless: custom colored header acts as title bar
         .transparent(false)
         .background_color(tauri::window::Color(255, 247, 209, 255))
-        .initialization_script(&init_script)
         .resizable(true)
         .shadow(true);
 
