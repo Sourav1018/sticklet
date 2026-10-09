@@ -127,6 +127,9 @@ pub fn run() {
             // Register Updater Plugin
             let _ = app.handle().plugin(tauri_plugin_updater::Builder::new().build());
 
+            // Register Notification Plugin
+            let _ = app.handle().plugin(tauri_plugin_notification::init());
+
             // Build Tray Context Menu
             let new_note_item = MenuItem::with_id(app, "new_note", "➕ New Note", true, None::<&str>)?;
             let show_hub_item = MenuItem::with_id(app, "show_hub", "📝 Notes Hub", true, None::<&str>)?;

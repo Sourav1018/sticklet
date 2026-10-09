@@ -15,6 +15,7 @@
     "@lucide/vue": "^1.52.0",
     "@pinia/nuxt": "^1.0.2",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-notification": "^2.5.1",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-updater": "^2.13.2",
     "@tiptap/extension-image": "^3.31.4",

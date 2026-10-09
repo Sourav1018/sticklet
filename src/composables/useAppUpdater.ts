@@ -1,7 +1,12 @@
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { check, type Update } from '@tauri-apps/plugin-updater'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from '@tauri-apps/plugin-notification'
 
 export type UpdateStatus =
   | 'idle'
@@ -25,6 +30,28 @@ const downloadProgress = ref<number>(0)
 const errorMessage = ref<string>('')
 let activeUpdate: Update | null = null
 let listenerRegistered = false
+let pollIntervalTimer: any = null
+
+// Check every 30 minutes in the background
+const POLL_INTERVAL_MS = 30 * 60 * 1000
+
+async function notifyDesktopUpdate(version: string) {
+  try {
+    let permission = await isPermissionGranted()
+    if (!permission) {
+      const permissionStatus = await requestPermission()
+      permission = permissionStatus === 'granted'
+    }
+    if (permission) {
+      sendNotification({
+        title: 'Sticklet Update Available!',
+        body: `Version v${version} is ready to install. Click to update.`,
+      })
+    }
+  } catch (err) {
+    console.warn('Could not display desktop notification:', err)
+  }
+}
 
 export function useAppUpdater() {
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
@@ -58,6 +85,9 @@ export function useAppUpdater() {
           body: update.body,
         }
         status.value = 'available'
+
+        // Show native desktop notification
+        await notifyDesktopUpdate(update.version)
         return true
       } else {
         activeUpdate = null
@@ -141,14 +171,29 @@ export function useAppUpdater() {
   onMounted(() => {
     if (isTauri && !listenerRegistered) {
       listenerRegistered = true
+
       listen('check-for-updates', () => {
         checkForUpdates(false)
       })
 
-      // Auto-check in background 4 seconds after app starts up
+      // Initial check 5 seconds after startup
       setTimeout(() => {
         checkForUpdates(true)
-      }, 4000)
+      }, 5000)
+
+      // Periodic Background Polling every 30 minutes
+      if (!pollIntervalTimer) {
+        pollIntervalTimer = setInterval(() => {
+          checkForUpdates(true)
+        }, POLL_INTERVAL_MS)
+      }
+    }
+  })
+
+  onBeforeUnmount(() => {
+    if (pollIntervalTimer) {
+      clearInterval(pollIntervalTimer)
+      pollIntervalTimer = null
     }
   })
 
@@ -163,3 +208,4 @@ export function useAppUpdater() {
     dismissModal,
   }
 }
+

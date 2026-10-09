@@ -27,6 +27,7 @@ rusqlite = { version = "0.40.2", features = ["bundled"] }
 rfd = "0.17.2"
 arboard = "3.6.1"
 tauri-plugin-updater = "2.13.2"
+tauri-plugin-notification = "2.5.1"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
