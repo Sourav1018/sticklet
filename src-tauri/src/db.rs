@@ -163,10 +163,10 @@ pub fn db_upsert_note(app: AppHandle, state: tauri::State<DbState>, note: DbNote
             color = excluded.color,
             is_pinned = excluded.is_pinned,
             is_open = excluded.is_open,
-            x = excluded.x,
-            y = excluded.y,
-            width = excluded.width,
-            height = excluded.height,
+            x = coalesce(excluded.x, notes.x),
+            y = coalesce(excluded.y, notes.y),
+            width = coalesce(excluded.width, notes.width),
+            height = coalesce(excluded.height, notes.height),
             updated_at = excluded.updated_at",
         params![
             note.id,
@@ -191,7 +191,7 @@ pub fn db_upsert_note(app: AppHandle, state: tauri::State<DbState>, note: DbNote
 
 #[tauri::command]
 pub fn db_update_note_bounds(
-    app: AppHandle,
+    _app: AppHandle,
     state: tauri::State<DbState>,
     note_id: String,
     bounds: WindowBounds,
@@ -203,7 +203,6 @@ pub fn db_update_note_bounds(
     )
     .map_err(|e| format!("Failed to update bounds for {}: {}", note_id, e))?;
 
-    let _ = app.emit("notes-updated", &note_id);
     Ok(())
 }
 

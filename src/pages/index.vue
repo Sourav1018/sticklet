@@ -88,10 +88,11 @@ function selectNote(id: string) {
   notesStore.updateNote(id, { isOpen: true })
 }
 
-function openInDesktopWindow(id: string) {
+async function openInDesktopWindow(id: string) {
   notesStore.activeNoteId = id
+  await notesStore.flushPendingSave(id)
   const n = notesStore.getNote(id)
-  tauriWindow.openNoteWindow(
+  await tauriWindow.openNoteWindow(
     id,
     n && n.x !== undefined && n.y !== undefined
       ? { x: n.x, y: n.y, width: n.width, height: n.height }

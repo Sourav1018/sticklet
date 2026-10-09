@@ -120,6 +120,12 @@ const editor = useEditor({
       }
       return false
     },
+    handleDOMEvents: {
+      blur: () => {
+        notesStore.flushPendingSave(props.note.id)
+        return false
+      },
+    },
   },
   onUpdate: ({ editor }) => {
     const html = editor.getHTML()
@@ -127,17 +133,18 @@ const editor = useEditor({
   },
 })
 
-// Update editor content if note content changed externally
+// Update editor content only if changed externally and editor is not currently focused
 watch(
   () => props.note.content,
   (newContent) => {
-    if (editor.value && editor.value.getHTML() !== newContent) {
+    if (editor.value && !editor.value.isFocused && editor.value.getHTML() !== newContent) {
       editor.value.commands.setContent(newContent, { emitUpdate: false })
     }
   }
 )
 
 onBeforeUnmount(() => {
+  notesStore.flushPendingSave(props.note.id)
   editor.value?.destroy()
 })
 
@@ -202,7 +209,12 @@ function handleFileSelect(e: Event) {
   target.value = ''
 }
 
-function handleClose() {
+async function handleClose() {
+  if (editor.value) {
+    const html = editor.value.getHTML()
+    notesStore.updateNote(props.note.id, { content: html }, true)
+  }
+  await notesStore.flushPendingSave(props.note.id)
   emit('close', props.note.id)
 }
 

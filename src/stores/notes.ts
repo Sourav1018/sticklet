@@ -113,6 +113,8 @@ export const useNotesStore = defineStore('notes', () => {
 
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
+  const pendingSaveTimers = new Map<string, any>()
+
   // Helper to persist single note to SQLite in background
   async function persistNoteToDb(note: Note) {
     if (isTauri) {
@@ -139,6 +141,33 @@ export const useNotesStore = defineStore('notes', () => {
     }
   }
 
+  // Force flush any pending debounced save to SQLite immediately
+  async function flushPendingSave(id?: string) {
+    if (id) {
+      if (pendingSaveTimers.has(id)) {
+        clearTimeout(pendingSaveTimers.get(id))
+        pendingSaveTimers.delete(id)
+      }
+      const note = notes.value.find((n) => n.id === id)
+      if (note) {
+        saveNotes()
+        await persistNoteToDb(note)
+      }
+    } else {
+      const promises: Promise<void>[] = []
+      for (const [noteId, timer] of pendingSaveTimers.entries()) {
+        clearTimeout(timer)
+        const note = notes.value.find((n) => n.id === noteId)
+        if (note) {
+          promises.push(persistNoteToDb(note))
+        }
+      }
+      pendingSaveTimers.clear()
+      saveNotes()
+      await Promise.all(promises)
+    }
+  }
+
   let listenersInitialized = false
   function setupListeners() {
     if (listenersInitialized || !isTauri) return
@@ -147,6 +176,9 @@ export const useNotesStore = defineStore('notes', () => {
     listen('notes-updated', async (event) => {
       const updatedId = event.payload as string
       if (!updatedId) return
+      // Don't overwrite if we currently have an unsaved local edit pending
+      if (pendingSaveTimers.has(updatedId)) return
+
       try {
         const dbNote = await invoke<Note | null>('db_get_note', { noteId: updatedId })
         if (dbNote) {
@@ -167,6 +199,10 @@ export const useNotesStore = defineStore('notes', () => {
     listen('note-deleted', (event) => {
       const deletedId = event.payload as string
       if (!deletedId) return
+      if (pendingSaveTimers.has(deletedId)) {
+        clearTimeout(pendingSaveTimers.get(deletedId))
+        pendingSaveTimers.delete(deletedId)
+      }
       const idx = notes.value.findIndex((n) => n.id === deletedId)
       if (idx !== -1) {
         notes.value.splice(idx, 1)
@@ -177,7 +213,7 @@ export const useNotesStore = defineStore('notes', () => {
     })
   }
 
-  // Fetch a specific note with multi-stage fallback & retry
+  // Fetch a specific note with multi-stage fallback & retry (never overwrites with empty content)
   async function fetchNote(id: string): Promise<Note | undefined> {
     if (!id) return undefined
     setupListeners()
@@ -205,8 +241,24 @@ export const useNotesStore = defineStore('notes', () => {
     const foundAfterLoad = notes.value.find((n) => n.id === id)
     if (foundAfterLoad) return foundAfterLoad
 
-    // 4. Retry after delay in case DB write was in flight
-    await new Promise((resolve) => setTimeout(resolve, 150))
+    // 4. Check localStorage fallback
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY)
+        if (stored) {
+          const parsed = JSON.parse(stored) as Note[]
+          const localNote = parsed.find((n) => n.id === id)
+          if (localNote) {
+            notes.value.unshift(localNote)
+            await persistNoteToDb(localNote)
+            return localNote
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 5. Retry query after brief delay
+    await new Promise((resolve) => setTimeout(resolve, 200))
     if (isTauri) {
       try {
         const retryNote = await invoke<Note | null>('db_get_note', { noteId: id })
@@ -217,21 +269,7 @@ export const useNotesStore = defineStore('notes', () => {
       } catch (_) {}
     }
 
-    // 5. Ultimate safeguard: instantiate note so window is NEVER blank
-    const fallbackNote: Note = {
-      id,
-      title: 'New note',
-      content: '',
-      color: 'yellow',
-      isPinned: false,
-      isOpen: true,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    }
-    notes.value.unshift(fallbackNote)
-    saveNotes()
-    await persistNoteToDb(fallbackNote)
-    return fallbackNote
+    return undefined
   }
 
   // Load notes from SQLite if running in Tauri, falling back to localStorage
@@ -323,8 +361,12 @@ export const useNotesStore = defineStore('notes', () => {
     return newNote
   }
 
-  // Update note content or properties
-  function updateNote(id: string, updates: Partial<Omit<Note, 'id' | 'createdAt'>>) {
+  // Update note content or properties with automatic debouncing and immediate backup
+  function updateNote(
+    id: string,
+    updates: Partial<Omit<Note, 'id' | 'createdAt'>>,
+    immediate = false
+  ) {
     const note = notes.value.find((n) => n.id === id)
     if (!note) return
 
@@ -341,8 +383,25 @@ export const useNotesStore = defineStore('notes', () => {
     if (updates.height !== undefined) note.height = updates.height
 
     note.updatedAt = Date.now()
-    saveNotes()
-    persistNoteToDb(note)
+    saveNotes() // Immediate synchronous write to local backup
+
+    if (immediate) {
+      if (pendingSaveTimers.has(id)) {
+        clearTimeout(pendingSaveTimers.get(id))
+        pendingSaveTimers.delete(id)
+      }
+      persistNoteToDb(note)
+    } else {
+      // Debounce SQLite persistence by 300ms during typing
+      if (pendingSaveTimers.has(id)) {
+        clearTimeout(pendingSaveTimers.get(id))
+      }
+      const timer = setTimeout(() => {
+        pendingSaveTimers.delete(id)
+        persistNoteToDb(note)
+      }, 300)
+      pendingSaveTimers.set(id, timer)
+    }
   }
 
   // Delete note
@@ -443,5 +502,6 @@ export const useNotesStore = defineStore('notes', () => {
     getNote,
     fetchNote,
     persistNoteToDb,
+    flushPendingSave,
   }
 })

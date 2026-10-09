@@ -40,7 +40,7 @@ const note = computed(() => {
 async function saveCurrentBounds() {
   const bounds = await tauriWindow.getWindowBounds()
   if (bounds && noteId.value) {
-    notesStore.updateNote(noteId.value, {
+    await notesStore.updateNoteBounds(noteId.value, {
       x: Math.round(bounds.x),
       y: Math.round(bounds.y),
       width: Math.round(bounds.width),
@@ -64,11 +64,17 @@ onMounted(async () => {
       }, 200)
     }
 
+    const flushBeforeExit = () => {
+      notesStore.flushPendingSave(noteId.value)
+    }
+
     // Capture position/size whenever user finishes dragging or resizing
     window.addEventListener('mouseup', debouncedSaveBounds)
     window.addEventListener('resize', debouncedSaveBounds)
+    window.addEventListener('beforeunload', flushBeforeExit)
 
     onBeforeUnmount(() => {
+      window.removeEventListener('beforeunload', flushBeforeExit)
       window.removeEventListener('mouseup', debouncedSaveBounds)
       window.removeEventListener('resize', debouncedSaveBounds)
     })
@@ -76,8 +82,9 @@ onMounted(async () => {
 })
 
 async function handleClose() {
+  await notesStore.flushPendingSave(noteId.value)
   await saveCurrentBounds()
-  tauriWindow.closeNoteWindow(noteId.value)
+  await tauriWindow.closeNoteWindow(noteId.value)
 }
 
 async function handleNewNote() {
