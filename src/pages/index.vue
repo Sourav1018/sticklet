@@ -6,6 +6,7 @@ import { useTauriWindow } from '@/composables/useTauriWindow'
 import { useNativeIO } from '@/composables/useNativeIO'
 import { useAppUpdater } from '@/composables/useAppUpdater'
 import { useTheme } from '@/composables/useTheme'
+import { detectFloatingNoteId } from '@/composables/useFloatingWindow'
 import { marked } from 'marked'
 import StickyNote from '@/components/StickyNote.vue'
 import UpdateDialog from '@/components/UpdateDialog.vue'
@@ -33,6 +34,7 @@ const appUpdater = useAppUpdater()
 const { isDark, toggleTheme } = useTheme()
 const selectedColorFilter = ref<NoteColor | 'all'>('all')
 const bannerMessage = ref('')
+const isFloating = computed(() => !!detectFloatingNoteId())
 
 async function handleImportFile() {
   const res = await nativeIO.openNoteFile()
@@ -50,7 +52,7 @@ async function handleImportFile() {
 
     const newNote = notesStore.createNote('yellow', htmlContent)
     await notesStore.persistNoteToDb(newNote)
-    await tauriWindow.openNoteWindow(newNote.id)
+    await tauriWindow.openNoteWindow(newNote.id, undefined, NOTE_COLORS.yellow.bg)
     showBanner('Note imported and converted successfully!')
   }
 }
@@ -98,10 +100,12 @@ const displayedNotes = computed(() => {
 })
 
 async function handleCreateNote(color?: NoteColor) {
-  const note = notesStore.createNote(color || (selectedColorFilter.value !== 'all' ? selectedColorFilter.value : 'yellow'))
+  const chosenColor = color || (selectedColorFilter.value !== 'all' ? selectedColorFilter.value : 'yellow')
+  const note = notesStore.createNote(chosenColor)
   await notesStore.persistNoteToDb(note)
+  const hexColor = NOTE_COLORS[chosenColor]?.bg || '#fff7d1'
   // Spawns as independent desktop window!
-  await tauriWindow.openNoteWindow(note.id)
+  await tauriWindow.openNoteWindow(note.id, undefined, hexColor)
 }
 
 function selectNote(id: string) {
@@ -113,11 +117,13 @@ async function openInDesktopWindow(id: string) {
   notesStore.activeNoteId = id
   await notesStore.flushPendingSave(id)
   const n = notesStore.getNote(id)
+  const hexColor = n ? (NOTE_COLORS[n.color]?.bg || '#fff7d1') : '#fff7d1'
   await tauriWindow.openNoteWindow(
     id,
     n && n.x !== undefined && n.y !== undefined
       ? { x: n.x, y: n.y, width: n.width, height: n.height }
-      : undefined
+      : undefined,
+    hexColor
   )
 }
 
@@ -131,7 +137,7 @@ function stripHtml(html: string): string {
 </script>
 
 <template>
-  <div class="h-screen w-screen flex bg-slate-100 dark:bg-zinc-950 text-slate-800 dark:text-zinc-100 overflow-hidden font-sans">
+  <div v-if="!isFloating" class="h-screen w-screen flex bg-slate-100 dark:bg-zinc-950 text-slate-800 dark:text-zinc-100 overflow-hidden font-sans">
     <!-- LEFT SIDEBAR: Notes Hub (Microsoft Notes List) -->
     <aside class="w-80 border-r border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col h-full shadow-sm z-10 flex-shrink-0">
       <!-- Hub Header with Search & New Note -->

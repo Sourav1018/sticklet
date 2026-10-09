@@ -4,7 +4,7 @@ import type { WindowBounds } from '@/stores/notes'
 export function useTauriWindow() {
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
-  async function openNoteWindow(noteId: string, bounds?: Partial<WindowBounds>) {
+  async function openNoteWindow(noteId: string, bounds?: Partial<WindowBounds>, bgColor?: string) {
     if (isTauri) {
       try {
         await invoke('open_note_window', {
@@ -13,6 +13,7 @@ export function useTauriWindow() {
           y: bounds?.y ?? null,
           width: bounds?.width ?? null,
           height: bounds?.height ?? null,
+          bgColor: bgColor ?? null,
         })
       } catch (err) {
         console.error('Failed to open note window via Tauri:', err)

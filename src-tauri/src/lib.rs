@@ -35,6 +35,7 @@ fn open_note_window(
     y: Option<f64>,
     width: Option<f64>,
     height: Option<f64>,
+    bg_color: Option<String>,
 ) -> Result<(), String> {
     let window_label = format!("note-{}", note_id);
 
@@ -49,13 +50,33 @@ fn open_note_window(
     let w = width.unwrap_or(340.0).max(240.0);
     let h = height.unwrap_or(400.0).max(200.0);
 
+    let bg = if let Some(hex) = bg_color {
+        let hex = hex.trim_start_matches('#');
+        if hex.len() == 6 {
+            let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(255);
+            let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(247);
+            let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(209);
+            tauri::window::Color(r, g, b, 255)
+        } else {
+            tauri::window::Color(255, 247, 209, 255)
+        }
+    } else {
+        tauri::window::Color(255, 247, 209, 255)
+    };
+
+    let init_script = format!(
+        "window.__STICKLET_NOTE_ID__ = '{}';",
+        note_id
+    );
+
     let mut builder = WebviewWindowBuilder::new(&app, &window_label, WebviewUrl::App("index.html".into()))
         .title("Sticklet")
         .inner_size(w, h)
         .min_inner_size(240.0, 200.0)
         .decorations(false) // Frameless: custom colored header acts as title bar
         .transparent(false)
-        .background_color(tauri::window::Color(255, 247, 209, 255))
+        .background_color(bg)
+        .initialization_script(&init_script)
         .resizable(true)
         .shadow(true);
 
