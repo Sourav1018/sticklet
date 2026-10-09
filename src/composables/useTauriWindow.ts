@@ -1,8 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { WindowBounds } from '@/stores/notes'
 
-export type { WindowBounds }
-
 export function useTauriWindow() {
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 

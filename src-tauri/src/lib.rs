@@ -1,13 +1,17 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+
 mod db;
 mod native_io;
 
 use db::{
-    db_delete_note, db_get_all_notes, db_update_note_bounds, db_upsert_note, init_db,
+    db_delete_note, db_get_all_notes, db_get_note, db_update_note_bounds, db_upsert_note, init_db,
 };
 use native_io::{
     clipboard_read_text, clipboard_write_text, export_all_notes_to_folder, open_text_file,
     pick_folder, save_text_file,
 };
+
+static IS_QUITTING: AtomicBool = AtomicBool::new(false);
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -42,18 +46,22 @@ fn open_note_window(
         return Ok(());
     }
 
-    // Nuxt router is configured in hash mode: /#/note/<id>
-    let url = format!("/#/note/{}", note_id);
-
     let w = width.unwrap_or(340.0).max(240.0);
     let h = height.unwrap_or(400.0).max(200.0);
 
-    let mut builder = WebviewWindowBuilder::new(&app, &window_label, WebviewUrl::App(url.into()))
+    let init_script = format!(
+        "window.__STICKLET_NOTE_ID__ = '{}'; if (window.location.hash !== '#/note/{}') {{ window.location.hash = '#/note/{}'; }}",
+        note_id, note_id, note_id
+    );
+
+    let mut builder = WebviewWindowBuilder::new(&app, &window_label, WebviewUrl::App("index.html".into()))
         .title("Sticklet")
         .inner_size(w, h)
         .min_inner_size(240.0, 200.0)
         .decorations(false) // Frameless: custom colored header acts as title bar
         .transparent(false)
+        .background_color(tauri::window::Color(255, 247, 209, 255))
+        .initialization_script(&init_script)
         .resizable(true)
         .shadow(true);
 
@@ -160,7 +168,9 @@ pub fn run() {
                                 }
                             }
                             "quit" => {
+                                IS_QUITTING.store(true, Ordering::SeqCst);
                                 app.exit(0);
+                                std::process::exit(0);
                             }
                             _ => {}
                         }
@@ -189,9 +199,10 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Intercept closing the main Notes Hub window so the app stays running in tray
+            // Intercept closing the main Notes Hub window so the app stays running in tray,
+            // unless an explicit quit was requested.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == "main" {
+                if window.label() == "main" && !IS_QUITTING.load(Ordering::SeqCst) {
                     api.prevent_close();
                     let _ = window.hide();
                 }
@@ -204,6 +215,7 @@ pub fn run() {
             toggle_always_on_top,
             close_note_window,
             db_get_all_notes,
+            db_get_note,
             db_upsert_note,
             db_update_note_bounds,
             db_delete_note,

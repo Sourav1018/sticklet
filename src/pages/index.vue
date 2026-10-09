@@ -28,7 +28,8 @@ async function handleImportFile() {
   const res = await nativeIO.openNoteFile()
   if (res.success && res.content) {
     const newNote = notesStore.createNote('yellow', res.content)
-    tauriWindow.openNoteWindow(newNote.id)
+    await notesStore.persistNoteToDb(newNote)
+    await tauriWindow.openNoteWindow(newNote.id)
     showBanner('Note imported successfully!')
   }
 }
@@ -75,10 +76,11 @@ const displayedNotes = computed(() => {
   return list
 })
 
-function handleCreateNote(color?: NoteColor) {
+async function handleCreateNote(color?: NoteColor) {
   const note = notesStore.createNote(color || (selectedColorFilter.value !== 'all' ? selectedColorFilter.value : 'yellow'))
+  await notesStore.persistNoteToDb(note)
   // Spawns as independent desktop window!
-  tauriWindow.openNoteWindow(note.id)
+  await tauriWindow.openNoteWindow(note.id)
 }
 
 function selectNote(id: string) {

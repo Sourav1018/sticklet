@@ -2,7 +2,7 @@ use rusqlite::{params, Connection};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::WindowBounds;
 
@@ -47,6 +47,8 @@ pub fn init_db(app: &AppHandle) -> Result<DbState, String> {
 
     conn.execute_batch(
         "
+        PRAGMA journal_mode = WAL;
+        PRAGMA synchronous = NORMAL;
         CREATE TABLE IF NOT EXISTS notes (
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
@@ -69,6 +71,45 @@ pub fn init_db(app: &AppHandle) -> Result<DbState, String> {
     Ok(DbState {
         conn: Mutex::new(conn),
     })
+}
+
+#[tauri::command]
+pub fn db_get_note(state: tauri::State<DbState>, note_id: String) -> Result<Option<DbNote>, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, title, content, color, is_pinned, is_open, x, y, width, height, created_at, updated_at
+             FROM notes
+             WHERE id = ?1",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let mut note_iter = stmt
+        .query_map(params![note_id], |row| {
+            let is_pinned_int: i32 = row.get(4)?;
+            let is_open_int: i32 = row.get(5)?;
+            Ok(DbNote {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                content: row.get(2)?,
+                color: row.get(3)?,
+                is_pinned: is_pinned_int != 0,
+                is_open: is_open_int != 0,
+                x: row.get(6)?,
+                y: row.get(7)?,
+                width: row.get(8)?,
+                height: row.get(9)?,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    if let Some(note) = note_iter.next() {
+        Ok(Some(note.map_err(|e| e.to_string())?))
+    } else {
+        Ok(None)
+    }
 }
 
 #[tauri::command]
@@ -111,7 +152,7 @@ pub fn db_get_all_notes(state: tauri::State<DbState>) -> Result<Vec<DbNote>, Str
 }
 
 #[tauri::command]
-pub fn db_upsert_note(state: tauri::State<DbState>, note: DbNote) -> Result<(), String> {
+pub fn db_upsert_note(app: AppHandle, state: tauri::State<DbState>, note: DbNote) -> Result<(), String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     conn.execute(
         "INSERT INTO notes (id, title, content, color, is_pinned, is_open, x, y, width, height, created_at, updated_at)
@@ -144,11 +185,13 @@ pub fn db_upsert_note(state: tauri::State<DbState>, note: DbNote) -> Result<(), 
     )
     .map_err(|e| format!("Failed to upsert note {}: {}", note.id, e))?;
 
+    let _ = app.emit("notes-updated", &note.id);
     Ok(())
 }
 
 #[tauri::command]
 pub fn db_update_note_bounds(
+    app: AppHandle,
     state: tauri::State<DbState>,
     note_id: String,
     bounds: WindowBounds,
@@ -160,13 +203,16 @@ pub fn db_update_note_bounds(
     )
     .map_err(|e| format!("Failed to update bounds for {}: {}", note_id, e))?;
 
+    let _ = app.emit("notes-updated", &note_id);
     Ok(())
 }
 
 #[tauri::command]
-pub fn db_delete_note(state: tauri::State<DbState>, note_id: String) -> Result<(), String> {
+pub fn db_delete_note(app: AppHandle, state: tauri::State<DbState>, note_id: String) -> Result<(), String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM notes WHERE id = ?1", params![note_id])
         .map_err(|e| format!("Failed to delete note {}: {}", note_id, e))?;
+
+    let _ = app.emit("note-deleted", &note_id);
     Ok(())
 }

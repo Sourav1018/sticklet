@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 
 export type NoteColor = 'yellow' | 'green' | 'pink' | 'purple' | 'blue' | 'charcoal'
 
@@ -138,8 +139,104 @@ export const useNotesStore = defineStore('notes', () => {
     }
   }
 
+  let listenersInitialized = false
+  function setupListeners() {
+    if (listenersInitialized || !isTauri) return
+    listenersInitialized = true
+
+    listen('notes-updated', async (event) => {
+      const updatedId = event.payload as string
+      if (!updatedId) return
+      try {
+        const dbNote = await invoke<Note | null>('db_get_note', { noteId: updatedId })
+        if (dbNote) {
+          const idx = notes.value.findIndex((n) => n.id === updatedId)
+          if (idx !== -1) {
+            if (dbNote.updatedAt > notes.value[idx].updatedAt) {
+              notes.value[idx] = dbNote
+            }
+          } else {
+            notes.value.unshift(dbNote)
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to sync updated note:', e)
+      }
+    })
+
+    listen('note-deleted', (event) => {
+      const deletedId = event.payload as string
+      if (!deletedId) return
+      const idx = notes.value.findIndex((n) => n.id === deletedId)
+      if (idx !== -1) {
+        notes.value.splice(idx, 1)
+        if (activeNoteId.value === deletedId) {
+          activeNoteId.value = notes.value[0]?.id || null
+        }
+      }
+    })
+  }
+
+  // Fetch a specific note with multi-stage fallback & retry
+  async function fetchNote(id: string): Promise<Note | undefined> {
+    if (!id) return undefined
+    setupListeners()
+
+    // 1. Direct in-memory check
+    const existing = notes.value.find((n) => n.id === id)
+    if (existing) return existing
+
+    // 2. Query SQLite directly
+    if (isTauri) {
+      try {
+        const dbNote = await invoke<Note | null>('db_get_note', { noteId: id })
+        if (dbNote) {
+          notes.value.unshift(dbNote)
+          isLoaded.value = true
+          return dbNote
+        }
+      } catch (e) {
+        console.warn('db_get_note query failed:', e)
+      }
+    }
+
+    // 3. Fallback: load all notes
+    await loadNotes()
+    const foundAfterLoad = notes.value.find((n) => n.id === id)
+    if (foundAfterLoad) return foundAfterLoad
+
+    // 4. Retry after delay in case DB write was in flight
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    if (isTauri) {
+      try {
+        const retryNote = await invoke<Note | null>('db_get_note', { noteId: id })
+        if (retryNote) {
+          notes.value.unshift(retryNote)
+          return retryNote
+        }
+      } catch (_) {}
+    }
+
+    // 5. Ultimate safeguard: instantiate note so window is NEVER blank
+    const fallbackNote: Note = {
+      id,
+      title: 'New note',
+      content: '',
+      color: 'yellow',
+      isPinned: false,
+      isOpen: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+    notes.value.unshift(fallbackNote)
+    saveNotes()
+    await persistNoteToDb(fallbackNote)
+    return fallbackNote
+  }
+
   // Load notes from SQLite if running in Tauri, falling back to localStorage
   async function loadNotes() {
+    setupListeners()
     if (typeof window === 'undefined') return
     try {
       if (isTauri) {
@@ -344,5 +441,7 @@ export const useNotesStore = defineStore('notes', () => {
     togglePin,
     setNoteColor,
     getNote,
+    fetchNote,
+    persistNoteToDb,
   }
 })
