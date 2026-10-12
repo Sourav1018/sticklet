@@ -253,6 +253,7 @@ function handleNewNote() {
     <header
       class="header-bar flex items-center justify-between px-2.5 py-1.5 transition-colors cursor-move select-none"
       data-tauri-drag-region="deep"
+      @mousedown="tauriWindow.startDragging"
       :style="{
         backgroundColor: currentColorTheme.header,
         borderBottom: `1px solid ${currentColorTheme.border}`,

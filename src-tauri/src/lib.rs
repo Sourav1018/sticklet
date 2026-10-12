@@ -28,7 +28,7 @@ pub struct WindowBounds {
 }
 
 #[tauri::command]
-fn open_note_window(
+async fn open_note_window(
     app: AppHandle,
     note_id: String,
     x: Option<f64>,
@@ -69,7 +69,8 @@ fn open_note_window(
         note_id
     );
 
-    let mut builder = WebviewWindowBuilder::new(&app, &window_label, WebviewUrl::App("index.html".into()))
+    let page_url = format!("index.html?note={}", note_id);
+    let mut builder = WebviewWindowBuilder::new(&app, &window_label, WebviewUrl::App(page_url.into()))
         .title("Sticklet")
         .inner_size(w, h)
         .min_inner_size(240.0, 200.0)

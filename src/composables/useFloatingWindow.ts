@@ -9,12 +9,25 @@ import type { WindowBounds } from '@/stores/notes'
 export function detectFloatingNoteId(): string | null {
   if (typeof window === 'undefined') return null
 
-  // 1. Injected directly by Rust WebviewWindowBuilder initialization_script
+  // 1. URL query params (?note=<id>) - Available synchronously at instant page evaluation on all OSs
+  try {
+    const params = new URLSearchParams(window.location.search)
+    const noteParam = params.get('note')
+    if (noteParam) return noteParam
+  } catch (_) {}
+
+  // 2. URL hash (#/note/<id>)
+  if (window.location.hash.startsWith('#/note/')) {
+    const id = window.location.hash.replace('#/note/', '').split('?')[0]
+    if (id) return id
+  }
+
+  // 3. Injected directly by Rust WebviewWindowBuilder initialization_script
   if ((window as any).__STICKLET_NOTE_ID__) {
     return (window as any).__STICKLET_NOTE_ID__
   }
 
-  // 2. Tauri internals webview/window label
+  // 4. Tauri internals webview/window label
   if ('__TAURI_INTERNALS__' in window) {
     try {
       const internals = (window as any).__TAURI_INTERNALS__
@@ -25,25 +38,12 @@ export function detectFloatingNoteId(): string | null {
     } catch (_) {}
   }
 
-  // 3. WebviewWindow instance label
+  // 5. WebviewWindow instance label
   try {
     const current = getCurrentWebviewWindow()
     if (current?.label && current.label.startsWith('note-')) {
       return current.label.slice(5)
     }
-  } catch (_) {}
-
-  // 4. URL hash (#/note/<id>)
-  if (window.location.hash.startsWith('#/note/')) {
-    const id = window.location.hash.replace('#/note/', '').split('?')[0]
-    if (id) return id
-  }
-
-  // 5. URL query params (?note=<id>)
-  try {
-    const params = new URLSearchParams(window.location.search)
-    const noteParam = params.get('note')
-    if (noteParam) return noteParam
   } catch (_) {}
 
   return null

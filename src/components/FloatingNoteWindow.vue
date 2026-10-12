@@ -80,10 +80,28 @@ onMounted(async () => {
 
     window.addEventListener('mouseup', debouncedSaveBounds)
     window.addEventListener('resize', debouncedSaveBounds)
+    window.addEventListener('blur', debouncedSaveBounds)
     window.addEventListener('beforeunload', flushBeforeExit)
 
+    // Listen to native window moved/resized events if running in Tauri
+    let unlistenMoved: (() => void) | null = null
+    let unlistenResized: (() => void) | null = null
+    if (floatingWindow.isTauri) {
+      try {
+        const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow')
+        const currentWin = getCurrentWebviewWindow()
+        if (currentWin) {
+          unlistenMoved = await currentWin.onMoved(debouncedSaveBounds)
+          unlistenResized = await currentWin.onResized(debouncedSaveBounds)
+        }
+      } catch (_) {}
+    }
+
     onBeforeUnmount(() => {
+      if (unlistenMoved) unlistenMoved()
+      if (unlistenResized) unlistenResized()
       window.removeEventListener('beforeunload', flushBeforeExit)
+      window.removeEventListener('blur', debouncedSaveBounds)
       window.removeEventListener('mouseup', debouncedSaveBounds)
       window.removeEventListener('resize', debouncedSaveBounds)
     })
@@ -113,6 +131,7 @@ onMounted(async () => {
       <header
         class="flex items-center justify-between px-3 py-2 bg-amber-100 border-b border-amber-200 cursor-move select-none"
         data-tauri-drag-region="deep"
+        @mousedown="tauriWindow.startDragging"
       >
         <span class="text-xs font-semibold opacity-75">Sticklet</span>
         <button
@@ -138,6 +157,7 @@ onMounted(async () => {
       <header
         class="flex items-center justify-between px-3 py-2 bg-amber-100 border-b border-amber-200 cursor-move select-none"
         data-tauri-drag-region="deep"
+        @mousedown="tauriWindow.startDragging"
       >
         <span class="text-xs font-semibold opacity-75">Sticklet</span>
         <button
