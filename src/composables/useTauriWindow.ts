@@ -42,6 +42,15 @@ export function useTauriWindow() {
         return
       }
       try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window')
+        const currentWin = getCurrentWindow()
+        if (currentWin && typeof currentWin.startDragging === 'function') {
+          await currentWin.startDragging()
+          return
+        }
+      } catch (_) {}
+
+      try {
         await invoke('start_drag')
       } catch (err) {
         console.error('Failed to start dragging via Tauri:', err)

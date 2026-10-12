@@ -98,9 +98,24 @@ function generateId(): string {
   return 'note_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7)
 }
 
+function decodeHtmlEntities(text: string): string {
+  if (typeof document !== 'undefined') {
+    const doc = new DOMParser().parseFromString(text, 'text/html')
+    return doc.body.textContent || ''
+  }
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+}
+
 function extractTitleFromContent(htmlContent: string): string {
   // Strip HTML tags to find the first line of text
-  const tmp = htmlContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  const stripped = htmlContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  const tmp = decodeHtmlEntities(stripped)
   if (!tmp) return 'Empty note'
   return tmp.length > 40 ? tmp.substring(0, 40) + '...' : tmp
 }

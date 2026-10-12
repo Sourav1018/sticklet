@@ -130,13 +130,12 @@ onMounted(async () => {
     >
       <header
         class="flex items-center justify-between px-3 py-2 bg-amber-100 border-b border-amber-200 cursor-move select-none"
-        data-tauri-drag-region="deep"
+        data-tauri-drag-region
         @mousedown="tauriWindow.startDragging"
       >
-        <span class="text-xs font-semibold opacity-75">Sticklet</span>
+        <span class="text-xs font-semibold opacity-75" data-tauri-drag-region>Sticklet</span>
         <button
           type="button"
-          data-tauri-drag-region="false"
           class="text-xs p-1 hover:bg-black/10 rounded transition-colors"
           title="Close"
           @click="handleClose"
@@ -156,13 +155,12 @@ onMounted(async () => {
     >
       <header
         class="flex items-center justify-between px-3 py-2 bg-amber-100 border-b border-amber-200 cursor-move select-none"
-        data-tauri-drag-region="deep"
+        data-tauri-drag-region
         @mousedown="tauriWindow.startDragging"
       >
-        <span class="text-xs font-semibold opacity-75">Sticklet</span>
+        <span class="text-xs font-semibold opacity-75" data-tauri-drag-region>Sticklet</span>
         <button
           type="button"
-          data-tauri-drag-region="false"
           class="text-xs p-1 hover:bg-black/10 rounded transition-colors"
           title="Close"
           @click="handleClose"

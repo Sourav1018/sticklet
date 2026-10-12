@@ -252,7 +252,7 @@ function handleNewNote() {
     <!-- Draggable Header Bar -->
     <header
       class="header-bar flex items-center justify-between px-2.5 py-1.5 transition-colors cursor-move select-none"
-      data-tauri-drag-region="deep"
+      data-tauri-drag-region
       @mousedown="tauriWindow.startDragging"
       :style="{
         backgroundColor: currentColorTheme.header,
@@ -260,10 +260,9 @@ function handleNewNote() {
       }"
     >
       <!-- Left: New Note Button -->
-      <div class="flex items-center space-x-1" data-tauri-drag-region="false">
+      <div class="flex items-center space-x-1">
         <button
           type="button"
-          data-tauri-drag-region="false"
           class="header-btn p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
           title="New note (Ctrl+N)"
           @click="handleNewNote"
@@ -273,16 +272,18 @@ function handleNewNote() {
       </div>
 
       <!-- Middle: Title or drag hint -->
-      <div class="flex-1 text-center text-xs font-medium opacity-60 truncate px-2 select-none" data-tauri-drag-region="deep">
+      <div
+        class="flex-1 text-center text-xs font-medium opacity-60 truncate px-2 select-none"
+        data-tauri-drag-region
+      >
         {{ note.title || 'Sticklet' }}
       </div>
 
       <!-- Right: Actions (Pin, Menu, Close) -->
-      <div class="flex items-center space-x-1 relative" data-tauri-drag-region="false">
+      <div class="flex items-center space-x-1 relative">
         <!-- Always on Top / Pin Button -->
         <button
           type="button"
-          data-tauri-drag-region="false"
           class="header-btn p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
           :class="{ 'opacity-100 font-bold': note.isPinned, 'opacity-65': !note.isPinned }"
           :title="note.isPinned ? 'Unpin from top' : 'Always on top'"
@@ -293,10 +294,9 @@ function handleNewNote() {
         </button>
 
         <!-- Color & Options Menu Toggle -->
-        <div class="relative" data-tauri-drag-region="false">
+        <div class="relative">
           <button
             type="button"
-            data-tauri-drag-region="false"
             class="header-btn p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors opacity-65 hover:opacity-100"
             title="Menu & Colors"
             @click="isMenuOpen = !isMenuOpen"
