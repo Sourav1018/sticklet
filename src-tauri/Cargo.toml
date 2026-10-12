@@ -1,6 +1,6 @@
 [package]
 name = "sticklet"
-version = "0.1.6"
+version = "0.1.7"
 description = "Sticklet - Modern Sticky Notes for Linux"
 authors = ["you"]
 edition = "2021"
