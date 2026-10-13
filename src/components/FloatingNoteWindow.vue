@@ -133,7 +133,7 @@ onMounted(async () => {
         data-tauri-drag-region
         @mousedown="tauriWindow.startDragging"
       >
-        <span class="text-xs font-semibold opacity-75" data-tauri-drag-region>Sticklet</span>
+        <span class="text-xs font-semibold opacity-75 pointer-events-none">Sticklet</span>
         <button
           type="button"
           class="text-xs p-1 hover:bg-black/10 rounded transition-colors"
@@ -158,7 +158,7 @@ onMounted(async () => {
         data-tauri-drag-region
         @mousedown="tauriWindow.startDragging"
       >
-        <span class="text-xs font-semibold opacity-75" data-tauri-drag-region>Sticklet</span>
+        <span class="text-xs font-semibold opacity-75 pointer-events-none">Sticklet</span>
         <button
           type="button"
           class="text-xs p-1 hover:bg-black/10 rounded transition-colors"

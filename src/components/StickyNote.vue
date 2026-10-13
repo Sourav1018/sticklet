@@ -273,8 +273,7 @@ function handleNewNote() {
 
       <!-- Middle: Title or drag hint -->
       <div
-        class="flex-1 text-center text-xs font-medium opacity-60 truncate px-2 select-none"
-        data-tauri-drag-region
+        class="flex-1 text-center text-xs font-medium opacity-60 truncate px-2 select-none pointer-events-none"
       >
         {{ note.title || 'Sticklet' }}
       </div>

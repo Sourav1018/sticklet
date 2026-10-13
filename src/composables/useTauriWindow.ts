@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import type { WindowBounds } from '@/stores/notes'
 
 export function useTauriWindow() {
@@ -34,27 +35,27 @@ export function useTauriWindow() {
     return null
   }
 
-  async function startDragging(e: MouseEvent) {
+  function startDragging(e: MouseEvent) {
     if (isTauri && e.button === 0) {
       // Don't drag if user clicked on a button or interactive child element
       const target = e.target as HTMLElement | null
       if (target?.closest('button, input, select, textarea, [role="button"], [role="menu"]')) {
         return
       }
+
+      // 1. Primary: trigger native OS drag synchronously using Tauri v2 window API
       try {
-        const { getCurrentWindow } = await import('@tauri-apps/api/window')
         const currentWin = getCurrentWindow()
         if (currentWin && typeof currentWin.startDragging === 'function') {
-          await currentWin.startDragging()
+          currentWin.startDragging()
           return
         }
       } catch (_) {}
 
-      try {
-        await invoke('start_drag')
-      } catch (err) {
+      // 2. Fallback: invoke Rust start_drag command
+      invoke('start_drag').catch((err) => {
         console.error('Failed to start dragging via Tauri:', err)
-      }
+      })
     }
   }
 
